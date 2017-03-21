@@ -1,3 +1,5 @@
 'use strict'
 
-console.log('test')
+module.exports = function main () {
+  console.log('test')
+}

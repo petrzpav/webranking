@@ -15,5 +15,11 @@
   "bugs": {
     "url": "https://github.com/petrzpav/webranking/issues"
   },
-  "homepage": "https://github.com/petrzpav/webranking#readme"
+  "homepage": "https://github.com/petrzpav/webranking#readme",
+  "dependencies": {
+    "eslint": "^3.18.0",
+    "eslint-config-standard": "^7.1.0",
+    "eslint-plugin-promise": "^3.5.0",
+    "eslint-plugin-standard": "^2.1.1"
+  }
 }
