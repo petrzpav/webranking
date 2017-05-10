@@ -17,6 +17,12 @@
   },
   "homepage": "https://github.com/petrzpav/webranking#readme",
   "dependencies": {
+    "cheerio": "^0.22.0",
+    "lodash": "^4.17.4",
+    "request": "^2.81.0",
+    "url-parse": "^1.1.9"
+  },
+  "devDependencies": {
     "eslint": "^3.18.0",
     "eslint-config-standard": "^7.1.0",
     "eslint-plugin-promise": "^3.5.0",
