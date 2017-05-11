@@ -1,56 +1,63 @@
 'use strict'
 
-const request = require('request')
+const rp = require('request-promise')
 const cheerio = require('cheerio')
-const _ = require('lodash')
+const db = require('../db')
 
-const debug = true
+const debug = false
 const sep = '==========================='
 
-function getPageLinks (baseURL, pageToVisit, limit = 3, depth = 0) {
+const visitedPages = {}
+const limit = 1
+
+function getPageLinks (baseURL, pageToVisit, depth = 0) {
   if (depth > limit) {
-    return
+    return Promise.resolve()
   }
   if (debug) {
     console.log(sep)
     console.log(`Visiting page ${pageToVisit}`)
     console.log(`Limit=${limit}, Depth=${depth}`)
   }
-  request(pageToVisit, (error, response, body) => {
-    if (error) {
-      console.error(error)
-      return
-    }
-    // Check status code (200 is HTTP OK)
-    if (debug) {
-      console.log(`Status code: ${response.statusCode}`)
-      console.log(sep)
-    }
-    if (response.statusCode === 200) {
-      // Parse the document body
-      const dom = cheerio.load(body)
-      dom('a[href^="http"]').each(function () {
-        const link = dom(this).attr('href')
-        if (link.startsWith(baseURL)) {
+  const options = {
+    uri: pageToVisit,
+    transform: cheerio.load,
+  }
+  return rp(options)
+    .then($ => {
+      $('a[href^="http"]').each(function () {
+        const outlink = $(this).attr('href')
+        if (!outlink.startsWith(baseURL)) {
           if (debug) {
             console.log('Skipping..')
           }
           return
         }
-        if (debug) {
-          let tab = ''
-          for (let i = 0; i < depth; i++) {
-            tab += '\t'
-          }
-          console.log(`${tab}${pageToVisit} => ${link}`)
+        const childRequest = processLink(baseURL, outlink, pageToVisit, depth)
+        if (!childRequest) {
+          db.addNode(outlink)
+          return
         }
-        getPageLinks(baseURL, link, limit, depth + 1)
+        db.addConnection(pageToVisit, outlink)
       })
-    }
-  })
+    })
+    .catch(err => {
+      console.error(err)
+    })
+}
+
+function processLink (baseURL, link, pageToVisit, depth) {
+  if (link in visitedPages) {
+    return false
+  }
+  if (debug) {
+    console.log(`${depth}: ${pageToVisit} => ${link}`)
+  }
+  visitedPages[link] = true
+  return getPageLinks(baseURL, link, depth + 1)
 }
 
 module.exports = function main () {
   const baseURL = 'https://cs.wikipedia.org/'
-  getPageLinks(baseURL, baseURL)
+  getPageLinks('https', baseURL)
 }
