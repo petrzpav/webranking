@@ -1,6 +1,6 @@
 'use strict'
 
-const rp = require('requestretry')
+const rp = require('request-promise')
 const cheerio = require('cheerio')
 const db = require('../db')
 
@@ -19,15 +19,18 @@ function getPageLinks (baseURL, pageToVisit, depth = 0) {
     console.log(`Visiting page ${pageToVisit}`)
     console.log(`Limit=${limit}, Depth=${depth}`)
   }
-  return rp(pageToVisit)
-    .then(response => {
-      const $ = cheerio.load(response.body)
+  const options = {
+    uri: pageToVisit,
+    transform: cheerio.load,
+  }
+  return rp(options)
+    .then($ => {
       const title = $('title').text()
-      const body = $('body').text()
+      // const body = $('body').text()
       db.addNode({
         title: title,
         url: pageToVisit,
-        body: body,
+        // body: body,
       })
       $('a[href^="/"]').each(function () {
         const outlink = `${baseURL}${$(this).attr('href')}`
@@ -46,6 +49,7 @@ function getPageLinks (baseURL, pageToVisit, depth = 0) {
       return pageToVisit
     })
     .catch(err => {
+
       console.error(err)
     })
 }
