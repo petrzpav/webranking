@@ -1,6 +1,6 @@
 'use strict'
 
-const rp = require('request-promise')
+const rp = require('requestretry')
 const cheerio = require('cheerio')
 const db = require('../db')
 
@@ -8,7 +8,7 @@ const debug = false
 const sep = '==========================='
 
 const visitedPages = {}
-const limit = 2
+const limit = 1
 
 function getPageLinks (baseURL, pageToVisit, depth = 0) {
   if (depth > limit) {
@@ -19,12 +19,9 @@ function getPageLinks (baseURL, pageToVisit, depth = 0) {
     console.log(`Visiting page ${pageToVisit}`)
     console.log(`Limit=${limit}, Depth=${depth}`)
   }
-  const options = {
-    uri: pageToVisit,
-    transform: cheerio.load,
-  }
-  return rp(options)
-    .then($ => {
+  return rp(pageToVisit)
+    .then(response => {
+      const $ = cheerio.load(response.body)
       const title = $('title').text()
       const body = $('body').text()
       db.addNode({
@@ -66,6 +63,5 @@ function processLink (baseURL, link, pageToVisit, depth) {
 
 module.exports = function main () {
   const baseURL = 'https://cs.wikipedia.org'
-  // getPageLinks(/^https:\/\/[^.]+\.wikipedia\.org/, baseURL)
   getPageLinks(baseURL, baseURL)
 }

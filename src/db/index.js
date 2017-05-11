@@ -8,7 +8,7 @@ const db = new neo4j.GraphDatabase({
   auth: {username: 'node', password: 'admin'},
 })
 
-function globalCallback(err, results) {
+function globalCallback (err, results) {
   if (err) {
     throw err
   }
@@ -37,6 +37,7 @@ create (src)-[r:linksTo]->(dest)`,
       srcUrl: srcUrl,
       destUrl: destUrl,
     },
+    lean: true,
   }, globalCallback)
 }
 
