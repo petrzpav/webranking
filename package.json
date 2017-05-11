@@ -17,6 +17,7 @@
   },
   "homepage": "https://github.com/petrzpav/webranking#readme",
   "dependencies": {
+    "bluebird": "^3.5.0",
     "cheerio": "^0.22.0",
     "lodash": "^4.17.4",
     "neo4j": "^2.0.0-RC2",

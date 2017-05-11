@@ -8,16 +8,19 @@ const debug = false
 const sep = '==========================='
 
 const visitedPages = {}
-const limit = 1
+const retryDelayMin = 1000
+const retryDelayMax = 3000
+const maxAttempts = 4
+const maxDepth = 2
 
-function getPageLinks (baseURL, pageToVisit, depth = 0) {
-  if (depth > limit) {
+function getPageLinks (baseURL, pageToVisit, depth = 0, attempt = 0) {
+  if (depth > maxDepth || attempt > maxAttempts) {
     return false
   }
   if (debug) {
     console.log(sep)
     console.log(`Visiting page ${pageToVisit}`)
-    console.log(`Limit=${limit}, Depth=${depth}`)
+    console.log(`Maxdepth=${maxDepth}, Depth=${depth}`)
   }
   const options = {
     uri: pageToVisit,
@@ -32,26 +35,42 @@ function getPageLinks (baseURL, pageToVisit, depth = 0) {
         url: pageToVisit,
         // body: body,
       })
+      let childPromises = []
       $('a[href^="/"]').each(function () {
         const outlink = `${baseURL}${$(this).attr('href')}`
-        const childRequest = processLink(baseURL, outlink, pageToVisit, depth)
-        if (!childRequest) {
+        const childPromise = processLink(baseURL, outlink, pageToVisit, depth)
+        if (!childPromise) {
           return
         }
-        childRequest
-          .then((dest) => {
-            if (!dest) {
-              return
-            }
-            db.addConnection(pageToVisit, dest)
-          })
+        childPromises.push(childPromise)
       })
-      return pageToVisit
+      if (childPromises.length !== 0) {
+        return Promise
+          .all(childPromises)
+          .then(results => {
+            results.forEach(dest => processResult(pageToVisit, dest))
+          })
+      }
+      return Promise.resolve(pageToVisit)
     })
     .catch(err => {
-
+      if (err.respose === undefined) {
+        console.log(`Attempt ${attempt}: ${pageToVisit}`)
+        setTimeout(
+          () => getPageLinks(baseURL, pageToVisit, depth, attempt + 1),
+          Math.random() * (retryDelayMax - retryDelayMin) + retryDelayMin
+        )
+        return
+      }
       console.error(err)
     })
+}
+
+function processResult (from, dest) {
+  if (!dest) {
+    return
+  }
+  db.addConnection(from, dest)
 }
 
 function processLink (baseURL, link, pageToVisit, depth) {
@@ -68,4 +87,7 @@ function processLink (baseURL, link, pageToVisit, depth) {
 module.exports = function main () {
   const baseURL = 'https://cs.wikipedia.org'
   getPageLinks(baseURL, baseURL)
+    .then(() => {
+      console.log('All done')
+    })
 }
