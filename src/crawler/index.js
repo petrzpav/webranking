@@ -8,11 +8,11 @@ const debug = false
 const sep = '==========================='
 
 const visitedPages = {}
-const limit = 1
+const limit = 2
 
 function getPageLinks (baseURL, pageToVisit, depth = 0) {
   if (depth > limit) {
-    return Promise.resolve()
+    return false
   }
   if (debug) {
     console.log(sep)
@@ -25,21 +25,28 @@ function getPageLinks (baseURL, pageToVisit, depth = 0) {
   }
   return rp(options)
     .then($ => {
-      $('a[href^="http"]').each(function () {
-        const outlink = $(this).attr('href')
-        if (!outlink.startsWith(baseURL)) {
-          if (debug) {
-            console.log('Skipping..')
-          }
-          return
-        }
+      const title = $('title').text()
+      const body = $('body').text()
+      db.addNode({
+        title: title,
+        url: pageToVisit,
+        body: body,
+      })
+      $('a[href^="/"]').each(function () {
+        const outlink = `${baseURL}${$(this).attr('href')}`
         const childRequest = processLink(baseURL, outlink, pageToVisit, depth)
         if (!childRequest) {
-          db.addNode(outlink)
           return
         }
-        db.addConnection(pageToVisit, outlink)
+        childRequest
+          .then((dest) => {
+            if (!dest) {
+              return
+            }
+            db.addConnection(pageToVisit, dest)
+          })
       })
+      return pageToVisit
     })
     .catch(err => {
       console.error(err)
@@ -58,6 +65,7 @@ function processLink (baseURL, link, pageToVisit, depth) {
 }
 
 module.exports = function main () {
-  const baseURL = 'https://cs.wikipedia.org/'
-  getPageLinks('https', baseURL)
+  const baseURL = 'https://cs.wikipedia.org'
+  // getPageLinks(/^https:\/\/[^.]+\.wikipedia\.org/, baseURL)
+  getPageLinks(baseURL, baseURL)
 }

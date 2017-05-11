@@ -19,6 +19,7 @@
   "dependencies": {
     "cheerio": "^0.22.0",
     "lodash": "^4.17.4",
+    "neo4j": "^2.0.0-RC2",
     "request": "^2.81.0",
     "request-promise": "^4.2.1",
     "url-parse": "^1.1.9"
