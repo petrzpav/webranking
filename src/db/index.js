@@ -1,79 +1,99 @@
 'use strict'
 
-const neo4j = require('neo4j');
+const neo4j = require('neo4j')
+const kue = require('kue')
 
-// todo lock when deleting..
-let nodes = []
-let connections = []
+const queryQueue = kue.createQueue({
+  jobEvents: false,
+})
 
 // Full options:
 const db = new neo4j.GraphDatabase({
   url: 'http://localhost:7474',
-  auth: {username: 'node', password: 'admin'},
+  auth: {username: 'neo4j', password: 'admin'},
 })
 
-function globalCallback (err, results) {
-  if (err) {
-    throw err
+function doNodeQuery (job, done) {
+  // add only connection, node already exists
+  if (!job.data.node) {
+    doConnectionQuery(job.data.srcUrl, job.data.destUrl, done)
+    return
   }
-  // skip results..
+  // add node, afther that add connection
+  db.cypher({
+    query: 'create(:Page {title: {title}, url: {url}, body: {body}})',
+    params: {
+      title: job.data.node.title,
+      url: job.data.node.url,
+      body: job.data.node.body,
+    },
+  }, (err, results) => {
+    if (err) {
+      console.log(err)
+      // throw err
+    }
+    // root node
+    if (!job.data.node.parentUrl) {
+      done()
+      return
+    }
+    console.log(`[Node] ${job.data.node.url}`)
+    doConnectionQuery(job.data.node.parentUrl, job.data.node.url, done)
+  })
+}
+
+function doConnectionQuery (srcUrl, destUrl, done) {
+  db.cypher({
+    query: `match (src:Page {url: {srcUrl}}), (dest:Page {url: {destUrl}})
+USING INDEX src:Page(url) USING INDEX dest:Page(url)
+create (src)-[r:linksTo]->(dest)`,
+    params: {
+      srcUrl: srcUrl,
+      destUrl: destUrl,
+    },
+    lean: true,
+  }, (err, results) => {
+    if (err) {
+      console.log(err)
+      // throw err
+    }
+    console.log(`[Conn] ${srcUrl} => ${destUrl}`)
+    done()
+  })
 }
 
 function addNode (node) {
-  console.log(`add ${node.url}`)
-  nodes.push(node)
-  if (nodes.length >= 50) {
-    insertNodes()
-    nodes = []
-    global.gc()
-  }
-}
-
-function insertNodes () {
-  console.log('Batch inserting nodes')
-  let batchQuery = []
-  nodes.forEach(node => {
-    batchQuery.push({
-      // query: 'create(:Page {title: {title}, url: {url}, body: {body}})',
-      query: 'create(:Page {title: {title}, url: {url}})',
-      params: {
-        title: node.title,
-        url: node.url,
-        // body: node.body,
-        lean: true,
-      },
-    })
-  })
-  db.cypher(batchQuery, globalCallback)
+  // console.log(`[AddNode] ${node.title}`)
+  queryQueue.create('glob_query', {
+    node: node,
+  }).removeOnComplete(true).save()
 }
 
 function addConnection (srcUrl, destUrl) {
-  console.log(`add connection ${srcUrl} => ${destUrl}`)
-  connections.push([srcUrl, destUrl])
-  if (connections.length >= 50) {
-    insertConnections()
-    connections = []
-    global.gc()
-  }
+  // console.log(`[AddConn] ${srcUrl} => ${destUrl}`)
+  queryQueue.create('glob_query', {
+    node: null,
+    srcUrl: srcUrl,
+    destUrl: destUrl,
+  }).removeOnComplete(true).save()
 }
 
-function insertConnections () {
-  console.log('Batch inserting connections')
-  let batchQuery = []
-  connections.forEach(connection => {
-    batchQuery.push({
-      query: `match (src:Page {url: {srcUrl}}), (dest:Page {url: {destUrl}})
-create (src)-[r:linksTo]->(dest)`,
-      params: {
-        srcUrl: connection[0],
-        destUrl: connection[1],
-        lean: true,
-      },
-      lean: true,
-    })
+function query (query, callback = null) {
+  db.cypher(query, (err, results) => {
+    if (err) {
+      console.log(err)
+      // throw err
+    }
+    if (!callback) {
+      return
+    }
+    callback(results)
   })
-  db.cypher(batchQuery, globalCallback)
 }
+
+query('CREATE INDEX ON :Page(url);')
+queryQueue.process('glob_query', 1, doNodeQuery)
 
 exports.addNode = addNode
 exports.addConnection = addConnection
+exports.query = query

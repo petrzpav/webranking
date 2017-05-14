@@ -2,20 +2,23 @@
 
 const rp = require('request-promise')
 const cheerio = require('cheerio')
+const Promise = require('bluebird')
 const db = require('../db')
 
 const debug = false
 const sep = '==========================='
 
 const visitedPages = {}
-const retryDelayMin = 1000
-const retryDelayMax = 3000
-const maxAttempts = 4
+// const retryDelayMin = 1000
+// const retryDelayMax = 3000
+const reqDelayMin = 500
+const reqDelayMax = 1500
+const maxAttempts = 2
 const maxDepth = 2
 
-function getPageLinks (baseURL, pageToVisit, depth = 0, attempt = 0) {
+function getPageLinks (baseURL, pageToVisit, parentUrl = null, depth = 0, attempt = 0) {
   if (depth > maxDepth || attempt > maxAttempts) {
-    return false
+    return Promise.resolve(false)
   }
   if (debug) {
     console.log(sep)
@@ -24,70 +27,60 @@ function getPageLinks (baseURL, pageToVisit, depth = 0, attempt = 0) {
   }
   const options = {
     uri: pageToVisit,
-    transform: cheerio.load,
+    resolveWithFullResponse: true,
   }
-  return rp(options)
-    .then($ => {
+  return Promise
+    .delay(Math.random() * (reqDelayMax - reqDelayMin) + reqDelayMin)
+    .then(() => rp(options))
+    .then(response => {
+      const $ = cheerio.load(response.body)
       const title = $('title').text()
-      // const body = $('body').text()
+      const body = $('body').text()
       db.addNode({
+        parentUrl: parentUrl,
         title: title,
         url: pageToVisit,
-        // body: body,
+        body: body,
       })
-      let childPromises = []
+      visitedPages[pageToVisit] = true
       $('a[href^="/"]').each(function () {
         const outlink = `${baseURL}${$(this).attr('href')}`
-        const childPromise = processLink(baseURL, outlink, pageToVisit, depth)
-        if (!childPromise) {
+        if (outlink in visitedPages) {
+          if (outlink !== pageToVisit) {
+            db.addConnection(pageToVisit, outlink)
+          }
           return
         }
-        childPromises.push(childPromise)
+        getPageLinks(baseURL, outlink, pageToVisit, depth + 1)
       })
-      if (childPromises.length !== 0) {
-        return Promise
-          .all(childPromises)
-          .then(results => {
-            results.forEach(dest => processResult(pageToVisit, dest))
-          })
-      }
       return Promise.resolve(pageToVisit)
     })
     .catch(err => {
-      if (err.respose === undefined) {
-        console.log(`Attempt ${attempt}: ${pageToVisit}`)
-        setTimeout(
-          () => getPageLinks(baseURL, pageToVisit, depth, attempt + 1),
-          Math.random() * (retryDelayMax - retryDelayMin) + retryDelayMin
-        )
-        return
-      }
-      console.error(err)
+      // if (err.respose === undefined) {
+      //   console.log(`[S${attempt}]: ${pageToVisit}`)
+      //   setTimeout(
+      //     () => getPageLinks(baseURL, pageToVisit, depth, attempt + 1),
+      //     Math.random() * (retryDelayMax - retryDelayMin) + retryDelayMin
+      //   )
+      //   return
+      // }
+      // console.error(err)
     })
 }
 
-function processResult (from, dest) {
-  if (!dest) {
-    return
-  }
-  db.addConnection(from, dest)
-}
-
-function processLink (baseURL, link, pageToVisit, depth) {
-  if (link in visitedPages) {
-    return false
-  }
-  if (debug) {
-    console.log(`${depth}: ${pageToVisit} => ${link}`)
-  }
-  visitedPages[link] = true
-  return getPageLinks(baseURL, link, depth + 1)
+function loadVisitedPages (callback) {
+  db.query('MATCH (n:Page) RETURN n.title AS title', results => {
+    results.forEach(result => {
+      visitedPages[result.title] = true
+    })
+    callback()
+  })
 }
 
 module.exports = function main () {
   const baseURL = 'https://cs.wikipedia.org'
-  getPageLinks(baseURL, baseURL)
-    .then(() => {
-      console.log('All done')
-    })
+  const pageToVisit = 'https://cs.wikipedia.org/wiki/Hlavn%C3%AD_strana'
+  // loadVisitedPages(() => {
+  return getPageLinks(baseURL, pageToVisit)
+  // })
 }
