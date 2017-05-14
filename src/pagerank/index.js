@@ -16,13 +16,13 @@ function init () {
   )
   // set 1/numOfOutlinks to pages with outlinks
   db.query(`
-    match (p:Page)-[r:linksTo]-()
+    match (p:Page)-[r:linksTo]->()
     with p, (1.0/count(p)) as cnt
     set p.pr=cnt;`
   )
   for (let i = 0; i < iterations; i++) {
     db.query(`
-      match (s:Page)-[r:linksTo]-(d:Page)
+      match (s:Page)-[r:linksTo]->(d:Page)
       with s, ( ${alfa} * d.pr * s.pr + (${alfa} * s.pr * ${a} + 1 - ${alfa}) * 1/count(*) ) as newPR
       set s.pr=newPR`
     )
