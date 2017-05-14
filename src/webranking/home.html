@@ -2,10 +2,21 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <style>
+    * {
+      font-family: sans-serif;
+    }
+  </style>
   <title>Webranking 1.0.0</title>
 </head>
 <body>
 <h1>Webranking</h1>
+<p>Webranking 1.0.0 is a seminar project by Pavel Petržela and Tomáš Martínek for BI-VWM, FIT CTU</p>
+<form action="http://127.0.0.1:3000/query" method="post">
+  <label for="queryWord">Query:</label>
+  <input type="text" id="queryWord" name="queryWord">
+  <input type="submit" value="Submit">
+</form>
 
 </body>
 </html>

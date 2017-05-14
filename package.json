@@ -27,6 +27,7 @@
     "url-parse": "^1.1.9"
   },
   "devDependencies": {
+    "body-parser": "^1.17.1",
     "eslint": "^3.18.0",
     "eslint-config-standard": "^7.1.0",
     "eslint-plugin-promise": "^3.5.0",
