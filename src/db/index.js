@@ -78,21 +78,30 @@ function addConnection (srcUrl, destUrl) {
   }).removeOnComplete(true).save()
 }
 
-function query (query, callback = null) {
-  db.cypher(query, (err, results) => {
+function doQuery (job, done) {
+  db.cypher(job.data.query, (err, results) => {
     if (err) {
       console.log(err)
       // throw err
     }
-    if (!callback) {
+    done()
+    if (!job.data.callback) {
       return
     }
-    callback(results)
+    job.data.callback(results)
   })
+}
+
+function query (query, callback) {
+  queryQueue.create('query', {
+    query: query,
+    callback: callback,
+  }).removeOnComplete(true).save()
 }
 
 query('CREATE INDEX ON :Page(url);')
 queryQueue.process('glob_query', 1, doNodeQuery)
+queryQueue.process('query', 1, doQuery)
 
 exports.addNode = addNode
 exports.addConnection = addConnection
