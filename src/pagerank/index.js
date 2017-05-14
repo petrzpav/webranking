@@ -2,7 +2,7 @@
 
 const db = require('../db')
 
-const iterations = 50
+const iterations = 10
 const alfa = 0.85
 const a = 1
 
@@ -23,7 +23,7 @@ function init () {
   for (let i = 0; i < iterations; i++) {
     db.query(`
       match (s:Page)-[r:linksTo]-(d:Page)
-      with s, ( ${alfa} * d.pr * s.pr + (${alfa} * s.pr * ${a} + 1- ${alfa}) * 1/count(*) ) as newPR
+      with s, ( ${alfa} * d.pr * s.pr + (${alfa} * s.pr * ${a} + 1 - ${alfa}) * 1/count(*) ) as newPR
       set s.pr=newPR`
     )
   }

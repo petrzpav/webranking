@@ -106,3 +106,4 @@ queryQueue.process('query', 1, doQuery)
 exports.addNode = addNode
 exports.addConnection = addConnection
 exports.query = query
+exports.doQuery = doQuery
