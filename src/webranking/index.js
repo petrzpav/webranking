@@ -32,11 +32,11 @@ app.post('/query', function (req, res) {
         return p.title as title, collect(distinct p.url)[0] as url, p.pr as pr 
         order by pr desc`,
         callback: response => {
-          let resp = '<ul>'
+          let resp = '<ol>'
           response.forEach(page => {
             resp += `<li>[${page.pr}] <a href="${page.url}">${page.title}</a></li>`
           })
-          resp += '</ul>'
+          resp += '</ol>'
           const answer = data.toString().replace('#queryWord#', resp)
           res.send(answer)
         },
